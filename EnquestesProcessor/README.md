@@ -1,11 +1,14 @@
-# README
+# READ ME
 
 ## INSTALL:
+
 - python 3.7
 - pip
 - macOS/Windows: GTK+ libraries
 ---
+
 ## RUN:
+
 - Execució d'estadística:
     ```bash
     python EnquestesProcessor.py [<seetings_file.yaml>]
@@ -23,7 +26,9 @@
     python EnquestesProcessor.py -t -c"
     ```
 ---
-## In case of error:
+
+### In case of error:
+
 - ImportError: cannot import name '_imaging' from 'PIL' (/usr/lib/python3/dist-packages/PIL/__init__.py)
     ```bash
     pip install --upgrade --force-reinstall pillow
