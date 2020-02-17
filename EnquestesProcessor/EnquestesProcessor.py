@@ -1,235 +1,208 @@
-#!/usr/bin/python3.6
-from core.terminal import *
-from core.worker import *
-import sys
+#!/usr/bin/python3.7
+# -*- coding: UTF-8 -*-
+from utilities.terminal import *
+import csv
 import os
+from pip._internal import main
+import subprocess
+import sys
 
-LOG_LEVEL = 2
-    #   0 = no log
-    #   1 = simple
-    #   2 = detailed  
-
-"""EnquestesProcessor_3.0: 
-Fitxers d'entrada:
-    - alumnes-mp.csv: llista dels alumnes matriculats a cada CF,
-                    amb el seu nom complet, l'adreça Xeill, el cicle i curs,
-                    i una «x» per cada MP al qual estigui matriculat
-    - respostes.csv: descarregat des del formulari d'avaluació de Google Drive,
-                    conté les valoracions dels alumnes
-Fitxers de sortida:
-    - finals:
-        * estadística_respostes.csv: conté la mitjana de les respostes per ítem
-                                    objecte avaluat i grup
-        * resultats_respostes.csv: conté les respostes per ser traspassades al
-                                full de càlcul final
-        * resultats_errades.csv: conté les respostes filtrades
-        * resultats_alumnes-respostes.csv: conté quins objectes han estat
-                                        avaluats per cada alumne
-    - registres (opcionalment eliminables):
-        * errades_rec.csv: conté les errades filtrades amb l'avaluació completa
-                        feta per l'estudiant
-        * resultats_rec.csv: conté les respostes filtrades amb l'avaluació
-                            completa feta per l'estudiant
-    - temporals (opcionalment eliminables):
-        * resultats_tmp.csv: conté les respostes vàlides amb la identificació
-                            de l'estudiant
-
-Novetats respecte a la versió 2.4:
-    - refactorització completa del codi
-    - incorporació d'un sistema de tests unitaris
+"""EnquestesProcessor:
+Executa el programa de manera normal o en mode test a partir de les opcions especificades a través de la
+línia de comandaments.
 """
 
-def setup_options():
-    """
-    Descripció: Demana a l'usuari que definieixi les opcions no establertes.
+REQUIREMENTS_FILE = 'requirements.txt'
+DEFAULT_SETTINGS_FILE = 'settings.yaml'
+
+def print_run_options():
+    """print_run_options()
+    Descripció: Imprimeix per pantalla les instruccions d'execució en cas que s'insereixin opcions incorrectes.
     Entrada:    Cap.
-    Sortida:    Defineix les variables globals OPTION_TMP_FILES,
-                OPTION_TMP_RECORDS, OPTION_DUPLICATED_ANSWERS en el seu cas.
+    Sortida:    Cap. Impremeix per missatge les instruccions d'execució.
     """
-    
-    while worker.OPTION_TMP_FILES != 0 and worker.OPTION_TMP_FILES != 1:        
-        terminal.writeln("Voleu conservar els arxius temporals? (s/n) ")
-        worker.OPTION_TMP_FILES = answer_from_string_to_binary(input().lower())
-
-    while worker.OPTION_TMP_RECORDS != 0 and worker.OPTION_TMP_RECORDS != 1:
-        terminal.writeln("Voleu conservar els registres? (s/n) ")
-        worker.OPTION_TMP_RECORDS = answer_from_string_to_binary(input().lower())
-
-    while worker.OPTION_DUPLICATED_ANSWERS != 0 and worker.OPTION_DUPLICATED_ANSWERS != 1:
-        terminal.writeln("En cas de respostes duplicades, quina voleu conservar? (1: la primera, 2: l'última) ")
-        worker.OPTION_DUPLICATED_ANSWERS = answer_from_string_to_binary(input().lower())
-
-    while worker.OPTION_REPORTS != 0 and worker.OPTION_REPORTS != 1:
-        terminal.writeln("Desitja generar els informes? (s/n) ")
-        worker.OPTION_REPORTS = answer_from_string_to_binary(input().lower())
-
-def answer_from_string_to_binary(text):
-    """
-    Descripció: Converteix una string amb una 's'/'y' o amb una 'n' en un int 0 o 1 respectivament.
-    Entrada:    string
-    Sortida:    int
-    Exemple:    'n' retorna 1
-    """
-    return 1 if text == 'y' or text == 's' or text == '2' else 0    
-
-def offer_navigation_menu_for_troublesome_source_files(source_file):
-    """
-    Descripció: Ofereix a l'usuari l'opció de solucionar un problema amb els
-                fitxers d'entrada i continuar amb l'execució del programa, o bé
-                interrompre'l.
-    Entrada:    String amb el nom del fitxer d'entrada.
-    Sortida:    Executa una determinada funció segons l'opció triada.
-    """    
+    terminal.breakline()        
+    terminal.writeln("Executeu el programa d'acord amb una de les següents opcions:",
+                     TerminalColors.YELLOW)
     terminal.tab()
-    terminal.breakline()
-    terminal.writeln("Què voleu fer? Trieu una opció:", TerminalColors.UNDERLINE)
-
-    terminal.tab()
-    terminal.write("1. ", TerminalColors.CYAN)
-    terminal.writeln("Solucionar el problema i seguir.")
-    terminal.write("2. ", TerminalColors.CYAN)
-    terminal.writeln("Voleu sortir del programa")
+    terminal.writeln("a) Execució d'estadística: python EnquestesProcessor.py [<seetings_file.yaml>]")
+    terminal.writeln("b) Execució de tests complets: python EnquestesProcessor.py -t [verbosity: <0> | <1> | <2>]")
+    terminal.writeln("c) Execució de tests unitaris: python EnquestesProcessor.py -t -u [verbosity: <0> | <1> | <2>]")
+    terminal.writeln("d) Execució de test d'execució completa del codi: python EnquestesProcessor.py -t -c")
+    terminal.breakline
     terminal.untab()
 
-    option = input()
-    if option == "1":
-        terminal.writeln("Si us plau, assegureu-vos de què heu solucionat el problema i premeu «Enter».")
-        terminal.untab()
 
-        input()
-        if LOG_LEVEL > 0: terminal.write("Reintentant... ")
-        check_source_file(source_file)
-
-    elif option == "2":
-        terminal.untab()
-        exit()
-
+def run_manager(settings_yaml_file, reinstalled_modules):
+    """run_manager(settings_yaml_file, reinstalled_modules)
+    Descripció: Instal·la els mòduls requerits, reinstal·lant-los a la força en cas d'error i executa la
+                classe Manager.
+    Entrada:    Fitxer amb els ajustos de configuració. Indicació de si els mòduls ja han estat reinstal·lats
+                alguna vegada durant el procés.
+    Sortida:    Cap. Instal·la els mòduls i executa la classe Manager.
+    """
+    if (reinstalled_modules is True):
+        manager = Manager(settings_yaml_file)
+        manager.run_worker()
     else:
-        terminal.writeln("Si us plau, assegureu-vos de què heu solucionat una opció vàlida.")
-        terminal.untab()
-        offer_navigation_menu_for_troublesome_source_files(source_file)
+        try:
+            manager = Manager(settings_yaml_file)
+            manager.run_worker()
+        except:
+            reinstall_modules()
+            reinstalled_modules = True
+            run_manager(settings_yaml_file, reinstalled_modules)
 
-def check_source_file(source_file):
+
+def run_test_manager(reinstalled_modules, unit_tests_verbosity_level=2):
+    """run_test_manager(reinstalled_modules, unit_tests_verbosity_level=2)
+    Descripció: Instal·la els mòduls requerits, reinstal·lant-los a la força en cas d'error i executa la
+                classe TestManager per l'execució dels tests unitaris i dels resultats complets.
+    Entrada:    Indicació de si els mòduls ja han estat reinstal·lats alguna vegada durant el procés.
+                Opcionalment el nivell de verbosity dels tests unitaris.
+    Sortida:    Cap. Instal·la els mòduls i executa els tests unitaris i dels resultats complets de la
+                classe TestManager.
     """
-    Descripció: Comprova que el fitxer d'entrada existeix i no està buit.
-    Entrada:    String amb el nom del fitxer d'entrada.
-    Sortida:    Cap o crida a la funció
+    if (reinstalled_modules is True):
+        tester = TestManager()
+        tester.run_tests()
+    else:
+        try:
+            tester = TestManager()
+            tester.run_tests()
+        except:
+            reinstall_modules()
+            reinstalled_modules = True
+            run_test_manager(reinstalled_modules, unit_tests_verbosity_level)
+
+
+def run_unit_tests(reinstalled_modules, unit_tests_verbosity_level=2):
+    """run_unit_tests(reinstalled_modules, unit_tests_verbosity_level=2)
+    Descripció: Instal·la els mòduls requerits, reinstal·lant-los a la força en cas d'error i executa la
+                classe TestManager per l'execució dels tests unitaris.
+    Entrada:    Indicació de si els mòduls ja han estat reinstal·lats alguna vegada durant el procés.
+                Opcionalment el nivell de verbosity dels tests unitaris.
+    Sortida:    Cap. Instal·la els mòduls i executa els tests unitaris de la classe TestManager.
     """
-    if not os.path.exists(source_file):
-        error("No s'ha trobat a la carpeta el fitxer «%s»." % source_file)        
-        offer_navigation_menu_for_troublesome_source_files(source_file)
+    if (reinstalled_modules is True):
+        tester = TestManager()
+        tester.run_unit_tests(unit_tests_verbosity_level)
+    else:
+        try:
+            tester = TestManager()
+            tester.run_unit_tests(unit_tests_verbosity_level)
+        except:
+            reinstall_modules()
+            reinstalled_modules = True
+            run_unit_tests(reinstalled_modules, unit_tests_verbosity_level)
 
-    if os.path.getsize(source_file) == 0:
-        print("\nEl fitxer «%s» està buit." % source_file)
-        offer_navigation_menu_for_troublesome_source_files(source_file)
 
-def catch_exception(ex):    
-    error(str(ex))    
-    sys.exit()
+def run_complete_execution_test(reinstalled_modules):
+    """run_complete_execution_test(reinstalled_modules)
+    Descripció: Instal·la els mòduls requerits, reinstal·lant-los a la força en cas d'error i executa la
+                classe TestManager per l'execució dels tests dels resultats complets.
+    Entrada:    Indicació de si els mòduls ja han estat reinstal·lats alguna vegada durant el procés.
+    Sortida:    Cap. Instal·la els mòduls i executa els tests dels tests dels resultats complets a través
+                de la classe TestManager.
+    """
+    if (reinstalled_modules is True):
+        tester = TestManager()
+        tester.run_complete_execution_test()
+    else:
+        try:
+            tester = TestManager()
+            tester.run_complete_execution_test()
+        except:
+            reinstall_modules()
+            reinstalled_modules = True
+            run_complete_execution_test(reinstalled_modules)
 
-def succeed():
-    if LOG_LEVEL > 0: 
-        terminal.writeln("OK", TerminalColors.DARKGREEN)
 
-def error(details):
-    msg = ""
-    if LOG_LEVEL > 0: msg += "ERROR"
-    if LOG_LEVEL > 1: msg += ": " + details
-    
-    terminal.writeln(msg, TerminalColors.RED)
+def check_yaml_file_type(arg):
+    """check_yaml_file_type(arg)
+    Descripció: Comprova que el fitxer amb els ajustos proporcionat a través de la línia de comandaments
+                correspon al tipus YAML.
+    Entrada:    Argument amb el nom del fitxer.
+    Sortida:    True o False d'acord amb el resultat.
+    """
+    if not ('.' in arg):
+        return False
+    else:
+        extension_position = arg.count('.')
+        arg_extension = arg.split('.')[extension_position].lower()
+        if (arg_extension == 'yaml'):
+            return True
+        else:
+            return False
+
+
+def requirements_installation():
+    """requirements_installation()
+    Descripció: Instal·la els mòduls del fitxer de requeriments REQUIREMENTS_FILE.
+    Entrada:    Cap. Requereix de l'existència del fitxer de requeriments REQUIREMENTS_FILE.
+    Sortida:    Cap. Instal·la els mòduls necessaris no presents al sistema.
+    """
+    terminal.breakline()    
+    terminal.writeln("Instal·lant mòduls:", TerminalColors.DARKGREY)
+    subprocess.call([sys.executable, "-m", "pip", "install", "--user", "-r", "requirements.txt"])
+
+
+def reinstall_modules():
+    """reinstall_modules()
+    Descripció: Reinstal·la els mòduls del fitxer de requeriments REQUIREMENTS_FILE, encara que hi
+                siguin presents al sistema.
+    Entrada:    Cap. Requereix de l'existència del fitxer de requeriments REQUIREMENTS_FILE.
+    Sortida:    Cap. Reinstal·la tots els mòduls necessaris encara que siguin presents al sistema.
+    """
+    terminal.breakline()    
+    terminal.writeln("Degut a un error d'execució s'està provant a reinstal·lar els mòduls ja presents al sistema; " +
+                     "en cas que l'error persisteixi s'avortarà l'execució del programa:", TerminalColors.DARKGREY)
+    subprocess.call([sys.executable, "-m", "pip", "install", "--user", "-r", "requirements.txt", "--force-reinstall"])
+
 
 if __name__ == '__main__':
     global terminal
-    global worker
-
-    terminal = Terminal()  
+    terminal = Terminal()
+    requirements_installation()
     terminal.breakline()    
     terminal.write("Processador automàtic d'enquestes: ", TerminalColors.YELLOW)
     terminal.writeln("v3.0")
     terminal.write("Copyright © 2019: ", TerminalColors.YELLOW)
     terminal.writeln("INS Puig Castellar")
     terminal.write("Under the GPL v3.0 license: ", TerminalColors.YELLOW)
-    terminal.writeln("https://github.com/ElPuig/Aplicacions-Gestio-Dades")
+    terminal.writeln("https://github.com/ElPuig/Aplicacions-Gestio-Dades")    
     
-    terminal.breakline()        
-    terminal.writeln("Iniciant el procés:")
-    terminal.tab()    
+    from core.manager import *
+    from testing.testManager import *
+    
+    reinstalled_modules = False
 
-    worker = Worker()
-    if LOG_LEVEL > 0: terminal.write("Carregant configuració... ")
-    try:
-        #TODO: si no es diu el contrari, el programa pregunta, en cas contrari, es pot passar un fitxer yaml i llegeix d'aqui en comptes de preguntar
-        #setup_options()
-        succeed()
-    except Exception as ex:
-        catch_exception(ex)
-
-    if LOG_LEVEL > 0: terminal.write("Netejant fitxers antics... ")
-    try:
-        worker.clean_files()
-        succeed()
-    except Exception as ex:
-        catch_exception(ex)       
-        
-    if LOG_LEVEL > 0: terminal.write("Comprovant fitxers d'origen... ")
-    try:
-        check_source_file(worker.SOURCE_FILE_STUDENTS_WITH_MP)
-        check_source_file(worker.SOURCE_FILE_STUDENT_ANSWERS)    
-        succeed()
-    except Exception as ex:
-        catch_exception(ex)
-
-    if LOG_LEVEL > 0: terminal.write("Filtrant respostes invàlides... ")
-    try:        
-        id_to_email_and_name_dict = worker.anonymize_answers()
-        worker.filter_invalid_responses(id_to_email_and_name_dict)
-        succeed()
-    except Exception as ex:
-       catch_exception(ex)
-
-    if LOG_LEVEL > 0: terminal.write("Filtrant respostes duplicades... ")
-    try:
-        worker.filter_duplicated_answers()
-        succeed()
-    except Exception as ex:
-        catch_exception(ex)
-
-    if LOG_LEVEL > 0: terminal.write("Generant llistat de respostes... ")
-    try:
-        worker.generate_list_of_answers(id_to_email_and_name_dict)
-        worker.final_result_files_arranger(id_to_email_and_name_dict)
-        succeed()
-    except Exception as ex:
-        catch_exception(ex)
-
-    if LOG_LEVEL > 0: terminal.write("Eliminant les dades sensibles... ")
-    try:
-        worker.final_result_files_arranger(id_to_email_and_name_dict)
-        succeed()
-    except Exception as ex:
-        catch_exception(ex)
-
-    if LOG_LEVEL > 0: terminal.write("Generant estadísitiques... ")
-    try:
-        merged_grup_mp_dict = worker.generate_statistics()
-        succeed()
-    except Exception as ex:
-        catch_exception(ex)
-
-    if worker.OPTION_REPORTS == 1:
-        if LOG_LEVEL > 0: terminal.write("Generant informes... ")
-        try:
-            worker.generate_reports(**merged_grup_mp_dict)
-            succeed()
-        except Exception as ex:
-            catch_exception(ex)
-
-    if LOG_LEVEL > 0: terminal.write("Eliminant fitxers temporals... ")
-    try:
-        worker.clean_temp_files()
-        succeed()
-    except Exception as ex:
-        catch_exception(ex)
-
-    terminal.untab()
-    terminal.breakline()
+    if (len(sys.argv) > 4):
+        print_run_options()
+    elif (len(sys.argv) == 1):
+        run_manager(DEFAULT_SETTINGS_FILE, reinstalled_modules)
+    elif (len(sys.argv) == 2):
+        if (check_yaml_file_type(sys.argv[1]) is True):
+            run_manager(sys.argv[1])
+        elif (sys.argv[1] == '-t'):
+            run_test_manager(reinstalled_modules)
+        else:
+            print_run_options()
+    elif (len(sys.argv) >= 2):
+        if (sys.argv[1] != '-t'):
+            print_run_options()
+        elif (sys.argv[2] == '0' or sys.argv[2] == '1' or sys.argv[2] == '2'):
+            run_test_manager(reinstalled_modules, int(sys.argv[2]))
+        elif (sys.argv[2] == '-u'):
+            if (len(sys.argv) == 3):
+                run_unit_tests(reinstalled_modules)
+            elif (sys.argv[3] == '0' or sys.argv[3] == '1' or sys.argv[3] == '2'):
+                run_unit_tests(reinstalled_modules, int(sys.argv[3]))
+            else:
+                print_run_options()
+        elif (sys.argv[2] == '-c' and len(sys.argv) == 3):
+            run_complete_execution_test(reinstalled_modules)
+        else:
+            print_run_options()
+    else:
+        print_run_options()
