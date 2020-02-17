@@ -1,3 +1,5 @@
+#!/usr/bin/python3.7
+# -*- coding: UTF-8 -*-
 import unittest
 import os
 import sys
@@ -19,7 +21,7 @@ from core.worker import *
 
 class EnquestesProcessorTest(unittest.TestCase):
 
-    def test_clean_files(self):        
+    def test_clean_files(self):    
         worker = Worker()
 
         #When done, the folders must exists but output and temp must be empty        
@@ -29,7 +31,7 @@ class EnquestesProcessorTest(unittest.TestCase):
         if os.path.exists(worker.TEMP_FOLDER):
             shutil.rmtree(worker.TEMP_FOLDER)
         
-        #It will be called twice: the firs one to check if the folders has been created
+        #It will be called twice: the first one to check if the folders have been created
         worker.clean_files()
         self.assertEqual(os.path.exists(worker.OUTPUT_FOLDER), True)
         self.assertEqual(os.path.exists(worker.TEMP_FOLDER), True)
@@ -71,6 +73,7 @@ class EnquestesProcessorTest(unittest.TestCase):
         # check that s.split fails when the separator is not a string
         with self.assertRaises(TypeError):
             s.split(2)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

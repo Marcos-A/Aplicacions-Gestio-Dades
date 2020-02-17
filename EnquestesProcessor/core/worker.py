@@ -1,49 +1,62 @@
-import os
-import csv
-import uuid
+#!/usr/bin/python3.7
+# -*- coding: UTF-8 -*-
 import collections
-from dateutil import parser #pip3 install python-dateutil
+import csv
+from dateutil import parser
+import json
+import os
+from utilities.csvToPdfExporter.pdfCentreReportGenerator import *
+import uuid
+import yaml
 
 #Docstring documentation: https://www.python.org/dev/peps/pep-0257/
-class Worker:
+class Worker():
     #Contains the main code for parsing and processing the files, witout terminal interaction, just exceptions for errors.
-    INPUT_FOLDER = 'input'
-    OUTPUT_FOLDER = 'output'
-    TEMP_FOLDER = 'temp'
-    REPORT_FILE_ADM = os.path.join(OUTPUT_FOLDER, 'informe_Dept_Admin.csv')
-    REPORT_FILE_INF = os.path.join(OUTPUT_FOLDER, 'informe_Dept_Inform.csv')
-    REPORT_FILE_CENTRE = os.path.join(OUTPUT_FOLDER, 'informe_Centre.csv')
-    RESULT_FILE_ANSWERS = os.path.join(OUTPUT_FOLDER, 'resultats_respostes.csv')
-    RESULT_FILE_ERRORS = os.path.join(OUTPUT_FOLDER, 'resultats_errades.csv')
-    RESULT_FILE_STATISTICS = os.path.join(OUTPUT_FOLDER, 'estadística_respostes.csv')
-    RESULT_FILE_STUDENTS_WITH_AVALUATED_MP = os.path.join(OUTPUT_FOLDER, 'resultats_alumnes-respostes.csv')
-    TMP_ANONYMIZED_STUDENT_ANSWERS = os.path.join(TEMP_FOLDER, 'respostes_anonimitzades.csv')
-    TMP_FILE_ANSWERS = os.path.join(TEMP_FOLDER, 'resultats_tmp.csv')
-    RECORD_FILE_ERRORS = os.path.join(TEMP_FOLDER, 'errades_rec.csv')
-    RECORD_FILE_ANSWERS = os.path.join(TEMP_FOLDER, 'resultats_rec.csv')
-    SOURCE_FILE_STUDENTS_WITH_MP = os.path.join(INPUT_FOLDER, 'alumnes-mp.csv')
-    SOURCE_FILE_STUDENT_ANSWERS = os.path.join(INPUT_FOLDER, 'respostes.csv')
-    THRESHOLD_MERGE_GROUP_MP_ANSWERS = 4
 
-    OPTION_TMP_FILES = 1
-    #   0 = elimina
-    #   1 = conserva
-    #   2 = consulta a usuari
+    def __init__(self, settings_dict=yaml.safe_load(open('settings.yaml'))):
+        self.SETTINGS_DICT = settings_dict
+        self.GROUPS_INFO_FILE = self.SETTINGS_DICT['GROUPS_INFO_FILE']
 
-    OPTION_TMP_RECORDS = 1    
-    #   0 = elimina
-    #   1 = conserva
-    #   2 = consulta a usuari
+        #SETTINGS_DICT = yaml.safe_load(open('settings.yaml'))
+        self.INPUT_FOLDER = self.SETTINGS_DICT['INPUT_FOLDER']
+        self.OUTPUT_FOLDER = self.SETTINGS_DICT['OUTPUT_FOLDER']
+        self.TEMP_FOLDER = self.SETTINGS_DICT['TEMP_FOLDER']
+        self.UTILITIES_FOLDER = self.SETTINGS_DICT['UTILITIES_FOLDER']
+        self.CSV_TO_PDF_EXPORTER_FOLDER = self.SETTINGS_DICT['CSV_TO_PDF_EXPORTER_FOLDER']
+        self.TEMP_HTML_FILES_FOLDER = self.SETTINGS_DICT['TEMP_HTML_FILES_FOLDER']
+        self.TEMP_PDF_FILES_FOLDER = self.SETTINGS_DICT['TEMP_PDF_FILES_FOLDER']
 
-    OPTION_DUPLICATED_ANSWERS = 1
-    #   0 = conserva primera
-    #   1 = conserva nova
-    #   2 = consulta a usuari    
-    
-    OPTION_REPORTS = 1
-    #   0 = no
-    #   1 = sí
-    #   2 = consulta a usuari    
+        self.REPORT_FILE_ADM = os.path.join(self.OUTPUT_FOLDER, self.SETTINGS_DICT['REPORT_FILE_ADM'])
+        self.REPORT_FILE_INF = os.path.join(self.OUTPUT_FOLDER, self.SETTINGS_DICT['REPORT_FILE_INF'])
+        self.REPORT_FILE_CENTRE = os.path.join(self.OUTPUT_FOLDER, self.SETTINGS_DICT['REPORT_FILE_CENTRE'])
+        self.REPORT_PDF_FILE_CENTRE = os.path.join(self.OUTPUT_FOLDER, self.SETTINGS_DICT['REPORT_PDF_FILE_CENTRE'])
+        self.RESULT_FILE_ANSWERS = os.path.join(self.OUTPUT_FOLDER, self.SETTINGS_DICT['RESULT_FILE_ANSWERS'])
+        self.RESULT_FILE_ERRORS = os.path.join(self.OUTPUT_FOLDER, self.SETTINGS_DICT['RESULT_FILE_ERRORS'])
+        self.RESULT_FILE_STATISTICS = os.path.join(self.OUTPUT_FOLDER, self.SETTINGS_DICT['RESULT_FILE_STATISTICS'])
+        self.RESULT_FILE_STUDENTS_WITH_AVALUATED_MP = os.path.join(
+                                                        self.OUTPUT_FOLDER,
+                                                        self.SETTINGS_DICT['RESULT_FILE_STUDENTS_WITH_AVALUATED_MP'])
+        self.TMP_ANONYMIZED_STUDENT_ANSWERS = os.path.join(
+                                                        self.TEMP_FOLDER,
+                                                        self.SETTINGS_DICT['TMP_ANONYMIZED_STUDENT_ANSWERS'])
+        self.TMP_FILE_ANSWERS = os.path.join(self.TEMP_FOLDER, self.SETTINGS_DICT['TMP_FILE_ANSWERS'])
+        self.RECORD_FILE_ERRORS = os.path.join(self.TEMP_FOLDER, self.SETTINGS_DICT['RECORD_FILE_ERRORS'])
+        self.RECORD_FILE_ANSWERS = os.path.join(self.TEMP_FOLDER, self.SETTINGS_DICT['RECORD_FILE_ANSWERS'])
+        self.SOURCE_FILE_STUDENTS_WITH_MP = os.path.join(
+                                                self.INPUT_FOLDER,
+                                                self.SETTINGS_DICT['SOURCE_FILE_STUDENTS_WITH_MP'])
+        self.SOURCE_FILE_STUDENT_ANSWERS = os.path.join(
+                                                self.INPUT_FOLDER,
+                                                self.SETTINGS_DICT['SOURCE_FILE_STUDENT_ANSWERS'])
+        
+        self.THRESHOLD_MERGE_GROUP_MP_ANSWERS = self.SETTINGS_DICT['THRESHOLD_MERGE_GROUP_MP_ANSWERS']
+
+        self.OPTION_TMP_FILES = self.SETTINGS_DICT['OPTION_TMP_FILES']
+        self.OPTION_TMP_RECORDS = self.SETTINGS_DICT['OPTION_TMP_RECORDS']   
+        self.OPTION_DUPLICATED_ANSWERS = self.SETTINGS_DICT['OPTION_DUPLICATED_ANSWERS']
+        self.OPTION_REPORTS = self.SETTINGS_DICT['OPTION_REPORTS']
+        self.OPTION_EXPORT_REPORT_CENTRE_TO_PDF = self.SETTINGS_DICT['OPTION_EXPORT_REPORT_CENTRE_TO_PDF']
+        
 
     def filter_invalid_responses(self, id_to_email_and_name_dict):
         """
@@ -165,7 +178,7 @@ class Worker:
             
         finally:
             resultats_tmp.close()   
-                 
+                
     def filter_duplicated_answers(self):
         """
         Descripció: Filtra les respostes duplicades.
@@ -441,9 +454,9 @@ class Worker:
                     respectius que han estat fusionats amb el corresponent de 1r
                     curs per tractar-se de respostes de repetidors.
 
-        Sortida:    Fitxer self.REPORT_FILE_CENTRE
-                    Fitxer self.REPORT_FILE_ADM
-                    Fitxer self.REPORT_FILE_INF
+        Sortida:    Fitxer self.REPORT_FILE_CENTRE.
+                    Fitxer self.REPORT_FILE_ADM.
+                    Fitxer self.REPORT_FILE_INF.
         """
         depts_dict = {'ADMINISTRACIÓ': self.REPORT_FILE_ADM, 'INFORMÀTICA': self.REPORT_FILE_INF}
 
@@ -452,7 +465,7 @@ class Worker:
             report_dept_writer = csv.writer(report_dept)
             
             # Encapçalats
-            report_dept_writer.writerow(['GRUP', 'OBJECTE', 'ÍTEM 1', 'ÍTEM 2', 'ÍTEM 3', 'ÍTEM 4', 'NOMBRE RESPOSTES', 'COMENTARI'])
+            report_dept_writer.writerow(['GRUP', 'OBJECTE', 'ÍTEM 1', 'ÍTEM 2', 'ÍTEM 3', 'ÍTEM 4', 'NOMBRE RESPOSTES', 'COMENTARIS'])
 
             with open(self.RESULT_FILE_STATISTICS, 'r', encoding='utf-8') as statistics:
                 statistics_reader = csv.DictReader(statistics)
@@ -468,7 +481,7 @@ class Worker:
                                     if comments != '': 
                                         comments += '\n' 
                                     
-                                    comments += resultats_row['MP-COMENTARI' ].replace('\n', ' ')
+                                    comments += ' • ' + resultats_row['MP-COMENTARI' ].replace('\n', ' ')
                                 
                                 # Recupera els comentaris dels MP de 2n formats per
                                 # repetidors i fusionats amb els de 1r
@@ -480,7 +493,7 @@ class Worker:
                                                 if comments != '':
                                                     comments += '\n'
                                                 
-                                                comments += resultats_row['MP-COMENTARI'].replace('\n', ' ')
+                                                comments += ' • ' + resultats_row['MP-COMENTARI'].replace('\n', ' ')
                         
                         report_dept_writer.writerow(
                                                         [statistics_row['GRUP']] +
@@ -509,7 +522,7 @@ class Worker:
                                         if comments != '':
                                             comments += '\n'
                                         
-                                        comments += resultats_row['TUTORIA2-COMENTARI'].replace('\n', ' ')
+                                        comments += ' • ' + resultats_row['TUTORIA2-COMENTARI'].replace('\n', ' ')
 
                         report_dept_writer.writerow(
                                                         [statistics_row['GRUP']] +
@@ -527,7 +540,7 @@ class Worker:
         report_centre_writer = csv.writer(report_centre)
 
         # Encapçalats
-        report_centre_writer.writerow(['DEPARTAMENT', 'GRUP', 'ÍTEM 1', 'ÍTEM 2', 'ÍTEM 3','ÍTEM 4', 'ÍTEM 5', 'ÍTEM 6', 'NOMBRE RESPOSTES','COMENTARI'])
+        report_centre_writer.writerow(['DEPARTAMENT', 'GRUP', 'ÍTEM 1', 'ÍTEM 2', 'ÍTEM 3','ÍTEM 4', 'ÍTEM 5', 'ÍTEM 6', 'NOMBRE RESPOSTES','COMENTARIS'])
 
         with open(self.RESULT_FILE_STATISTICS, 'r', encoding='utf-8') as statistics:
                 statistics_reader = csv.DictReader(statistics)
@@ -545,7 +558,7 @@ class Worker:
                                             if comments != '':
                                                 comments += '\n'
 
-                                            comments += resultats_row['CENTRE-COMENTARI'].replace('\n', ' ')
+                                            comments += ' • ' + resultats_row['CENTRE-COMENTARI'].replace('\n', ' ')
 
                             report_centre_writer.writerow(
                                                             [self.__get_departament(statistics_row['GRUP'])] +
@@ -560,14 +573,97 @@ class Worker:
                                                             [comments]
                                                         )
         report_centre.close()
-    
+
+    def export_centre_report_to_pdf(self):
+        """
+        Descripció: Genera una versió en PDF a partir de l'informe de Centre en CSV,
+                    generant una versió intermitja en HTML.
+        Entrada:    Cap. Necessita però de l'existència del fitxer self.REPORT_FILE_CENTRE.
+        Sortida:    Fitxer self.REPORT_PDF_FILE_CENTRE.
+        """
+        if self.SETTINGS_DICT['OPTION_REPORTS'] == 0:
+            self.generate_reports(**merged_grup_mp_dict)
+                    
+        with open(self.GROUPS_INFO_FILE, 'r') as json_groups_file:
+            groups_dict = json.load(json_groups_file)
+        pdf_reporter = PDF_Centre_Report_Generator(self.SETTINGS_DICT)
+        cover_page_html_file_name = pdf_reporter.create_cover_page()
+        cover_page_pdf_file_name = self.remove_extension_from_filename(cover_page_html_file_name) + ".pdf"
+        pdf_reporter.print_html_to_pdf(os.path.join(self.TEMP_HTML_FILES_FOLDER, "0-" + cover_page_html_file_name),
+                                   os.path.join(self.TEMP_PDF_FILES_FOLDER, "0-" + cover_page_pdf_file_name))
+        group_pdf_files_list = ["0-" + cover_page_pdf_file_name]
+
+        report_centre_csv = open(self.REPORT_FILE_CENTRE, "r", encoding="utf-8")
+        report_centre_csv_dict = csv.DictReader(report_centre_csv)
+        group_files_list = []
+        num = 1
+        for row in report_centre_csv_dict:
+            grup = row["GRUP"]
+            pdf_reporter.create_group_page(grup, num, row, groups_dict[grup])
+            group_files_list.append(str(num) + "-report_" + grup)
+            num += 1
+
+        for group_file in group_files_list:
+            group_html_file = group_file + ".html"
+
+            group_pdf_file = group_file + ".pdf"
+            group_pdf_files_list.append(group_pdf_file)
+
+            pdf_reporter.print_html_to_pdf(os.path.join(self.TEMP_HTML_FILES_FOLDER, group_html_file),
+                                        os.path.join(self.TEMP_PDF_FILES_FOLDER, group_pdf_file))
+
+        self.remove_specified_file(os.path.join(self.REPORT_PDF_FILE_CENTRE))
+        pdf_reporter.merge_pdf_files(*group_pdf_files_list)
+
+        self.remove_only_files_in_folder(self.TEMP_HTML_FILES_FOLDER)
+        self.remove_only_files_in_folder(self.TEMP_PDF_FILES_FOLDER)
+
+        if self.SETTINGS_DICT['OPTION_REPORTS'] == 0:
+            if os.path.isfile(self.REPORT_FILE_ADM):
+                self.remove_specified_file(self.REPORT_FILE_ADM)
+            if os.path.isfile(self.REPORT_FILE_INF):
+                self.remove_specified_file(self.REPORT_FILE_INF)
+            if os.path.isfile(self.REPORT_FILE_CENTRE):
+                self.remove_specified_file(self.REPORT_FILE_CENTRE)
+
+    def remove_extension_from_filename(self, filename):
+        """
+        Descripció: Elimina l'extensió del nom del fitxer.
+        Entrada:    Nom del fitxer.
+        Sortida:    Nom del fitxer sense extensió (ni el punt que indica el seu inici).
+        """
+        extension_position = filename.count('.')
+        base_filename = filename.split('.')[extension_position-1]
+
+        return base_filename
+
+    def remove_specified_file(self, filename):
+        """
+        Descripció: Esborra el fitxer especificat.
+        Entrada:    Nom del fitxer.
+        Sortida:    Cap.
+        """
+        if  os.path.isfile(filename): 
+            os.remove(filename)
+
+    def remove_only_files_in_folder(self, dir_path):
+        """
+        Descripció: Esborra tots els fitxers del directori.
+        Entrada:    Ruta del directori.
+        Sortida:    Cap.
+        """
+        if os.path.exists(dir_path):
+            dirs_and_files_in_folder = os.scandir(dir_path)
+            for entry in dirs_and_files_in_folder:
+                if entry.is_file():
+                    os.remove(entry)
+
     def clean_files(self):
         """
         Descripció: Crea els directoris de sortida i elimina fitxers de sortida anteriors que puguin existir als directoris.
         Entrada:    Cap.
         Sortida:    Cap.
         """
-
         if not os.path.exists(self.INPUT_FOLDER):
             os.makedirs(self.INPUT_FOLDER)
 
@@ -577,8 +673,8 @@ class Worker:
         if not os.path.exists(self.TEMP_FOLDER):
             os.makedirs(self.TEMP_FOLDER)
 
-        self.__clean_folder(self.OUTPUT_FOLDER)
-        self.__clean_folder(self.TEMP_FOLDER)                       
+        self.remove_only_files_in_folder(self.OUTPUT_FOLDER)
+        self.remove_only_files_in_folder(self.TEMP_FOLDER)                       
 
     def clean_temp_files(self):
         """
@@ -636,13 +732,6 @@ class Worker:
                     anonymized_respostes_writer.writerow([respostes_row[0]] + [student_id] + respostes_row[2:])
             
         return id_to_email_and_name_dict
-
-    def __clean_folder(self, folder):
-        if os.path.exists(folder):                
-            for f in os.listdir(folder):
-                fp = os.path.join(folder, f)
-                if os.path.isfile(fp):
-                    os.remove(fp)    
 
     def __extract_resposta_mp_index(self, *mp_respostes_info):
         """
@@ -840,7 +929,7 @@ class Worker:
                     i nom com a valors, tots dos actualitzats amb les dades de l'estudiant passat com
                     a paràmetre.
         """
-        student_id = str(uuid.uuid4())
+        student_id = str(uuid.uuid4()).replace('-','')[:10].upper()
         
         if (student_id not in id_to_email_and_name_dict):
             email_to_id_dict[student_email] = student_id
@@ -850,25 +939,3 @@ class Worker:
 
         else:
             return self.__replace_student_email_with_random_id(student_email, student_name, email_to_id_dict, id_to_email_and_name_dict)
-
-    #TODO:NOT BEING USED: check if its correct    
-    #def find_avaluated_object(self, text):
-        """
-        Descripció: Classifica els grups per departaments (Adminsitració i
-                    Informàtica)
-        Entrada:    String
-        Sortida:    String
-        """
-        """
-        grups_mapping_list = [
-            ('AF', 'Administració'), 
-            ('ASIX', 'Informàtica'), 
-            ('DAM', 'Informàtica'), 
-            ('GA', 'Administració'), 
-            ('SMX', 'Informàtica')
-        ]
-
-        for k, v in grups_mapping_list:
-            if k in text:
-                return v
-        """

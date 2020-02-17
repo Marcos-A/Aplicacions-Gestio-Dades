@@ -1,7 +1,10 @@
 #!/usr/bin/python3.6
 # -*- coding: UTF-8 -*-
 
-"""GenericTestingFilesGenerator_1.0:
+"""GenericTestingFilesGenerator_1.1:
+A partide fitxers reals de respostes i registres d'estudiants amb els MP matriculats, genera fitxers
+anonimitzats, amb resultats aleatoris i comentaris genèrics pels tests del codi.
+
 Fitxers d'entrada
     - alumnes-mp.csv: llista dels alumnes matriculats a cada CF,
                       amb el seu nom complet, l'adreça Xeill, el cicle i curs,
@@ -30,6 +33,7 @@ GENERIC_SOURCE_FILE_STUDENT_ANSWERS = 'generic_respostes.csv'
 OUTPUT_DIR = 'GenericFiles'
 EMAIL_DOMAIN = '@elpuig.xeill.net'
 
+
 def replace_info_in_students_information_file():
     """replace_info_in_students_information_file()
     Descripció: Reemplaça el nom i email real de cada estudiant per uns altres genèrics.
@@ -46,24 +50,26 @@ def replace_info_in_students_information_file():
             compromised_alumnes_reader = csv.reader(compromised_alumnes)
             generic_alumnes_writer.writerow(next(compromised_alumnes_reader))
 
-            alumne_num = 1
+            alumne_counter = 1
             for alumne_row in compromised_alumnes_reader:
                 compromised_email = alumne_row[1]
-                generic_student_name = generic_student_name_generator(alumne_num)
-                generic_student_email = generic_student_email_generator(alumne_num)
+                student_group = alumne_row[2]
+                generic_student_name = generic_student_name_generator(alumne_counter)
+                generic_student_email = generic_student_email_generator(alumne_counter)
+                alumne_counter += 1
 
-                old_email_to_new_email_dict[compromised_email] = generic_student_email
+                old_email_to_new_email_dict[compromised_email] = {'generic_student_email': generic_student_email, 'group': student_group}
               
                 generic_alumnes_writer.writerow([generic_student_name] + [generic_student_email] +
                                                 alumne_row[2:])
-                alumne_num += 1
     
-    return old_email_to_new_email_dict
+    return alumne_counter, old_email_to_new_email_dict
 
-def replace_info_in_students_responses_file(**old_email_to_new_email_dict):
+
+def replace_info_in_students_responses_file(alumne_counter, **old_email_to_new_email_dict):
     """replace_info_in_students_responses_file(**old_email_to_new_email_dict)
     Descripció: Reemplaça l'email real dels estudiants amb l'equivalent genèric, les valoracions
-                numèriquesvper altres aleatòries i els comentaris per altres genèrics.
+                numèriques per altres aleatòries i els comentaris per altres genèrics.
     Entrada:    Diccionari old_email_to_new_email_dict amb l'email real a clau, i el
                 genèric com a valor.
     Sortida:    Cap.
@@ -75,36 +81,49 @@ def replace_info_in_students_responses_file(**old_email_to_new_email_dict):
             respostes_reader = csv.reader(compromised_respostes)
             generic_respostes_writer.writerow(next(respostes_reader))
             
+            current_comment_num = 1
             for respostes_row in respostes_reader:
                 r_compromised_email = respostes_row[1]
-                r_generic_email = old_email_to_new_email_dict.get(r_compromised_email)
+                if not (r_compromised_email in old_email_to_new_email_dict):
+                    old_email_to_new_email_dict[r_compromised_email] = {'generic_student_email': generic_student_email_generator(alumne_counter),
+                                                                        'group': None}
+                    alumne_counter += 1
+
+                r_generic_email = old_email_to_new_email_dict.get(r_compromised_email).get('generic_student_email')
+                r_group = old_email_to_new_email_dict.get(r_compromised_email).get('group')
+                if r_group is None:
+                    r_cicle = respostes_row[2]
+                    r_group = 'alumne i grup desconeguts, cicle declarat: ' + r_cicle
 
                 evaluated_item = extract_evaluated_item(*respostes_row[3:8])
 
-                random_evaluation = random_evaluation_generator(evaluated_item, *respostes_row[8:])
+                current_comment_num, random_evaluation = random_evaluation_generator(evaluated_item,
+                                                                                     r_group,
+                                                                                     current_comment_num,
+                                                                                     *respostes_row[8:])
 
                 generic_respostes_writer.writerow([respostes_row[0]] + [r_generic_email] + [respostes_row[2]] +
                                                   respostes_row[3:8] + random_evaluation)
 
 
-def generic_student_name_generator(alumne_num):
-    """generic_student_name_generator(alumne_num)
+def generic_student_name_generator(alumne_counter):
+    """generic_student_name_generator(alumne_counter)
     Descripció: Retorna un nom genèric per substituir el nom real dels estudiants.
     Entrada:    Número d'alumne processat.
     Sortida:    Nom genèric.
     """
-    generic_name = 'Alumne Núm. ' + str(alumne_num)
+    generic_name = 'Alumne Núm. ' + str(alumne_counter)
 
     return generic_name
 
 
-def generic_student_email_generator(alumne_num):
-    """generic_student_email_generator(alumne_num)
+def generic_student_email_generator(alumne_counter):
+    """generic_student_email_generator(alumne_counter)
     Descripció: Retorna un email genèric per substituir l'email real dels estudiants.
     Entrada:    Número d'alumne processat.
     Sortida:    Email genèric.
     """
-    generic_student_email = 'alumnenum' + str(alumne_num) + EMAIL_DOMAIN
+    generic_student_email = 'alumnenum' + str(alumne_counter) + EMAIL_DOMAIN
 
     return generic_student_email
 
@@ -127,24 +146,28 @@ def extract_evaluated_item(*compromised_row_items):
             compromised_row_items_index += 1
 
 
-def generic_student_comment_generator(evaluated_item):
-    """generic_student_comment_generator(evaluated_item)
+def generic_student_comment_generator(evaluated_item, group, current_comment_num):
+    """(evaluated_item, group, current_comment_num)
     Descripció: Retorna un comentari genèric per substituir un comentari real d'un estudiant.
-    Entrada:    Ítem al qual es refereix el comentari.
-    Sortida:    Comentari genèric.
+    Entrada:    Ítem al qual es refereix el comentari, grup de procedència del comentari i
+                número actual de comentaris.
+    Sortida:    Comentari genèric, número de comentari.
     """
-    generic_student_comment = "Comentari genèric sobre: " + str(evaluated_item)
+    generic_student_comment = "Comentari genèric núm. " + str(current_comment_num) + ". Grup de procedència: " +\
+                              group + ". Relatiu a: " + str(evaluated_item) + "."
 
-    return generic_student_comment
+    current_comment_num += 1
+
+    return generic_student_comment, current_comment_num
 
 
-def random_evaluation_generator(evaluated_item, *compromised_row_evaluations):
-    """random_evaluation_generator(evaluated_item, *compromised_row_evaluations)
+def random_evaluation_generator(evaluated_item, group, current_comment_num, *compromised_row_evaluations):
+    """(evaluated_item, group, current_comment_num, *compromised_row_evaluations)
     Descripció: Retorna unes valoracions i comentaris aleatoris per reemplaçar els reals.
-    Entrada:    Llistat amb aquelles columnes de la resposta que contenen les valoracions
-                i comentaris.
-    Sortida:    Llistat amb puntuacions aleatòries i, en el seu cas, un nou comentari
-                genèric.
+    Entrada:    Ítem avaluat, i grup al qual corresponent les respostes, número actual de comentaris,
+                i llistat amb aquelles columnes de la resposta que contenen les valoracions i comentaris.
+    Sortida:    Llistat amb puntuacions aleatòries amb, en el seu cas, un nou comentari
+                genèric; i número actual de comentaris.
     """
     compromised_row_evaluations = list(compromised_row_evaluations)
 
@@ -156,10 +179,12 @@ def random_evaluation_generator(evaluated_item, *compromised_row_evaluations):
             new_mark = str(random.randrange(1, 10))
             generic_respostes_row.append(new_mark)
         else:
-            new_comment = generic_student_comment_generator(evaluated_item)
+            new_comment, current_comment_num = generic_student_comment_generator(evaluated_item,
+                                                                                 group,
+                                                                                 current_comment_num)
             generic_respostes_row.append(new_comment)
 
-    return generic_respostes_row
+    return current_comment_num, generic_respostes_row
 
 
 def deliver_final_files():
@@ -214,8 +239,8 @@ def setup_files():
 if __name__ == '__main__':
     setup_files()
 
-    old_email_to_new_email_dict = replace_info_in_students_information_file()
+    alumne_counter, old_email_to_new_email_dict = replace_info_in_students_information_file()
 
-    replace_info_in_students_responses_file(**old_email_to_new_email_dict)
+    replace_info_in_students_responses_file(alumne_counter, **old_email_to_new_email_dict)
 
     deliver_final_files()

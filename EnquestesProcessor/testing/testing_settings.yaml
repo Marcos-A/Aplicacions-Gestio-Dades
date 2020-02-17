@@ -13,7 +13,7 @@ OPTION_TMP_RECORDS: 1
 # Reports Generation
 # 0 = no
 # 1 = sí
-# 2 = consulta a usuari 
+# 2 = consulta a usuari
 OPTION_REPORTS: 1
 # 0 = no
 # 1 = sí
@@ -21,27 +21,25 @@ OPTION_EXPORT_REPORT_CENTRE_TO_PDF: 1
 # Ignore Duplicated Responses Or Overwrite Past Responses
 # 0 = conserva primera
 # 1 = conserva nova
-# 2 = consulta a usuari    
+# 2 = consulta a usuari   
 OPTION_DUPLICATED_ANSWERS: 1
 # Threshold To Merge Results With 1st Course For 2nd Course Students Repeating The Subject
 THRESHOLD_MERGE_GROUP_MP_ANSWERS: 4
+# System Files Ignored During Testing Process
+IGNORED_FILES_LIST: ['.DS_Store']
 
 # PROGRAM EXECUTION FILES AND FOLDERS
 # Folders
-INPUT_FOLDER: input
-OUTPUT_FOLDER: output
-TEMP_FOLDER: temp
-TESTING_FOLDER: testing
+INPUT_FOLDER: testing/complete_testing_source_files
+OUTPUT_FOLDER: testing/complete_testing_beta_version_results/output
+TEMP_FOLDER: testing/complete_testing_beta_version_results/temp
 UTILITIES_FOLDER: utilities
-# Input Folders
-SOURCE_FILE_STUDENTS_WITH_MP: alumnes-mp.csv
-SOURCE_FILE_STUDENT_ANSWERS: respostes.csv
 # Input Files
 GROUPS_INFO_FILE: groups_data.json
 REQUIREMENTS_FILE: requirements.txt
-SETTINGS_FILE: settings.yaml
-TEST_SETTINGS_FILE: testing_settings.yaml
-# Output Folders
+SOURCE_FILE_STUDENTS_WITH_MP: alumnes-mp.csv
+SOURCE_FILE_STUDENT_ANSWERS: respostes.csv
+# Output Files
 # Temp Files
 TMP_ANONYMIZED_STUDENT_ANSWERS: respostes_anonimitzades.csv
 TMP_FILE_ANSWERS: resultats_tmp.csv
@@ -59,6 +57,15 @@ REPORT_FILE_ADM: Informe_Dept_Admin.csv
 REPORT_FILE_CENTRE: Informe_Centre.csv
 REPORT_PDF_FILE_CENTRE: Informe_Centre.pdf
 REPORT_FILE_INF: Informe_Dept_Inform.csv
+
+# TESTING FILES AND FOLDERS
+# Folders
+TESTING_FOLDER: testing
+STABLE_VERSION_FOLDER: complete_testing_stable_version_results
+BETA_VERSION_FOLDER: complete_testing_beta_version_results
+TMP_TESTING_COMPARISON_FOLDER: complete_testing_tmp_comparison_folder
+# Output Files
+COMPARISON_RESULT_LOG: error_log.csv
 
 # UTILITIES
 # Folders
